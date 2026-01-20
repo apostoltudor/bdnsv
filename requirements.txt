@@ -1,0 +1,11 @@
+# Baze de Date Drivers
+psycopg2-binary==2.9.9    # Pentru PostgreSQL
+pymongo==4.6.1            # Pentru MongoDB
+qdrant-client==1.7.0      # Pentru Vector DB
+
+# Utilitare
+Faker==22.5.1             # Pentru generare date fake
+pandas==2.2.0             # Pentru manipulare date
+python-dotenv==1.0.0      # Pentru variabile de mediu
+matplotlib==3.8.2         # Pentru grafice
+sentence-transformers==2.3.1 # Pentru AI Embeddings (Vectori)
