@@ -87,7 +87,7 @@ def generate_and_load():
     mongo_db["users"].drop()
     mongo_db["orders"].drop()
 
-    print("🚀 Incepem generarea datelor...")
+    print("Incepem generarea datelor...")
 
     #Generare produse
     products_data = []
