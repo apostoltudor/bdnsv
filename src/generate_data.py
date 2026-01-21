@@ -6,7 +6,7 @@ from faker import Faker
 import psycopg2
 from pymongo import MongoClient
 
-#folosim localhost ca sa lucram local
+#configurare conexiune
 PG_CONFIG = {
     "dbname": "shop_sql",
     "user": "admin",
