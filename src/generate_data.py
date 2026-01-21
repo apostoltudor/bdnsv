@@ -23,6 +23,43 @@ NUM_PRODUCTS = 500
 
 fake = Faker()
 
+#generam produse folosind permutari inteligente de cuvinte
+PRODUCT_TEMPLATES = {
+    "Electronics": {
+        "nouns": ["Laptop", "Smartphone", "Monitor", "Mouse", "Keyboard", "Headphones", "Tablet", "Smartwatch"],
+        "adjectives": ["Pro", "Gaming", "Ultra", "Office", "Budget", "Wireless", "Ergonomic", "4K"],
+        "descriptions": [
+            "High performance device suitable for gaming and heavy work.",
+            "Perfect for office work and productivity tasks.",
+            "Budget friendly option with essential features.",
+            "Premium quality build with latest technology.",
+            "Compact and portable, ideal for travel."
+        ]
+    },
+    "Clothing": {
+        "nouns": ["T-Shirt", "Jeans", "Jacket", "Dress", "Sneakers", "Hat", "Scarf", "Gloves"],
+        "adjectives": ["Cotton", "Leather", "Summer", "Winter", "Casual", "Elegant", "Vintage", "Slim-fit"],
+        "descriptions": [
+            "Comfortable and stylish, made from 100% organic materials.",
+            "Perfect for casual outings or daily wear.",
+            "Luxury item designed for special occasions.",
+            "Durable and warm, ideal for cold weather.",
+            "Lightweight and breathable design."
+        ]
+    },
+    "Home": {
+        "nouns": ["Lamp", "Chair", "Desk", "Sofa", "Rug", "Curtains", "Shelf", "Blender"],
+        "adjectives": ["Modern", "Rustic", "Minimalist", "Smart", "Wooden", "Metal", "Cozy", "LED"],
+        "descriptions": [
+            "Adds a touch of elegance to your living room.",
+            "Ergonomic design for maximum comfort.",
+            "Smart home compatible device.",
+            "Handcrafted from sustainable materials.",
+            "Essential utility for every modern home."
+        ]
+    }
+}
+
 def get_pg_connection():
     """Stabileste conexiunea la PostgreSQL cu retry logic."""
     retries = 5
@@ -70,17 +107,46 @@ def init_sql_schema(cursor):
             order_date TIMESTAMP
         );
     """)
-    print("Schema SQL creata cu tabelele: users, products, orders.")
+
+def generate_smart_product():
+    #genereaza un produs folosind template-ul definit si pune un pret realist
+    category = random.choice(list(PRODUCT_TEMPLATES.keys()))
+    template = PRODUCT_TEMPLATES[category]
+    
+    noun = random.choice(template["nouns"])
+    adj = random.choice(template["adjectives"])
+    base_desc = random.choice(template["descriptions"])
+    
+    name = f"{adj} {noun} {fake.year()}"
+    
+    #adaugam context in descriere pt a ajuta modelul AI
+    description = f"{base_desc} This {noun} is rated top tier in the {category} category."
+    
+    #calculul pretului pe baza cuvintelor din nume/descriere
+    if "Luxury" in description or "Pro" in name:
+        price = round(random.uniform(500, 3000), 2)
+    elif "Budget" in name:
+        price = round(random.uniform(20, 100), 2)
+    else:
+        price = round(random.uniform(50, 500), 2)
+        
+    return {
+        "name": name,
+        "category": category,
+        "price": price,
+        "description": description,
+        "specs": {"color": fake.color_name(), "warranty": "2 years"}
+    }
 
 def generate_and_load():
-    #Conexiuni
+    #stabilim conexiunile
     pg_conn = get_pg_connection()
     pg_cur = pg_conn.cursor()
     
     mongo_client = MongoClient(MONGO_URI)
     mongo_db = mongo_client["shop_nosql"]
     
-    # Curatam bazele de date vechi
+    #truncate
     init_sql_schema(pg_cur)
     pg_cur.execute("TRUNCATE users, products, orders RESTART IDENTITY CASCADE;")
     mongo_db["products"].drop()
@@ -89,36 +155,23 @@ def generate_and_load():
 
     print("Incepem generarea datelor...")
 
-    #Generare produse
+    #generare produse
     products_data = []
-    categories = ['Electronics', 'Clothing', 'Home', 'Books']
-    
-    print(f"   -> Generam {NUM_PRODUCTS} produse...")
+    print(f"   -> Generam {NUM_PRODUCTS} produse realiste...")
     for _ in range(NUM_PRODUCTS):
-        cat = random.choice(categories)
-        item = {
-            "name": f"{fake.word().title()} {fake.word().title()}",
-            "category": cat,
-            "price": round(random.uniform(10, 1000), 2),
-            "description": fake.text(max_nb_chars=200),
-            "specs": {
-                "color": fake.color_name(),
-                "weight": f"{random.randint(100, 2000)}g",
-                "warranty": "2 years"
-            }
-        }
+        item = generate_smart_product()
         products_data.append(item)
 
-        #Insert in SQL
+        #insert in sql
         pg_cur.execute("""
             INSERT INTO products (name, category, price, description, specs)
             VALUES (%s, %s, %s, %s, %s)
         """, (item['name'], item['category'], item['price'], item['description'], json.dumps(item['specs'])))
 
-        #Insert in mongo
+        #insert in mongo
         mongo_db["products"].insert_one(item.copy())
 
-    #Generare useri
+    #generare useri
     users_data = []
     print(f"   -> Generam {NUM_USERS} useri...")
     for _ in range(NUM_USERS):
@@ -130,7 +183,7 @@ def generate_and_load():
         }
         users_data.append(user)
         
-        #Insert SQL
+        #insert SQL
         pg_cur.execute("""
             INSERT INTO users (name, email, city, created_at)
             VALUES (%s, %s, %s, %s)
@@ -146,8 +199,7 @@ def generate_and_load():
     with open("dataset_initial.json", "w") as f:
         json.dump({"products": products_data, "users": [str(u) for u in users_data]}, f, default=str)
     
-    print(f"Succes! Datele au fost incarcate in Postgres si Mongo.")
-    print(f"Dataset salvat in 'dataset_initial.json'.")
+    print(f"Done! Datele sunt incarcate.")
 
     pg_cur.close()
     pg_conn.close()
