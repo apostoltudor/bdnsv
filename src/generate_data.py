@@ -6,8 +6,7 @@ from faker import Faker
 import psycopg2
 from pymongo import MongoClient
 
-# --- CONFIGURARE ---
-# Folosim localhost pentru ca rulam scriptul de pe masina ta, catre Docker
+#folosim localhost ca sa lucram local
 PG_CONFIG = {
     "dbname": "shop_sql",
     "user": "admin",
@@ -18,7 +17,7 @@ PG_CONFIG = {
 
 MONGO_URI = "mongodb://admin:password123@localhost:27017/"
 
-# Numar de date de generat
+#numar de date de generat
 NUM_USERS = 100
 NUM_PRODUCTS = 500 
 
@@ -32,14 +31,14 @@ def get_pg_connection():
             conn = psycopg2.connect(**PG_CONFIG)
             return conn
         except Exception as e:
-            print(f"⏳ Asteptam Postgres... ({e})")
+            print(f"Asteptam Postgres... ({e})")
             time.sleep(2)
             retries -= 1
-    raise Exception("Nu s-a putut conecta la PostgreSQL!")
+    raise Exception("Nu s-a putut conecta la PostgreSQL.")
 
 def init_sql_schema(cursor):
-    """Creeaza tabelele in stil relational (Schema Rigida)."""
-    # Tabel Users
+    """Creeaza tabelele in stil relational."""
+    #tabel Users
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
@@ -50,7 +49,7 @@ def init_sql_schema(cursor):
         );
     """)
     
-    # Tabel Products
+    #tabel Products
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS products (
             id SERIAL PRIMARY KEY,
@@ -58,11 +57,11 @@ def init_sql_schema(cursor):
             category VARCHAR(50),
             price DECIMAL(10, 2),
             description TEXT,
-            specs JSONB  -- Aici trisam putin, Postgres stie JSON, dar il vom folosi limitat
+            specs JSONB
         );
     """)
     
-    # Tabel Orders (Relational - doar ID-uri)
+    #tabel Orders
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS orders (
             id SERIAL PRIMARY KEY,
@@ -71,17 +70,17 @@ def init_sql_schema(cursor):
             order_date TIMESTAMP
         );
     """)
-    print("✅ Schema SQL creata (Tabele: users, products, orders).")
+    print("Schema SQL creata cu tabelele: users, products, orders.")
 
 def generate_and_load():
-    # 1. Conexiuni
+    #Conexiuni
     pg_conn = get_pg_connection()
     pg_cur = pg_conn.cursor()
     
     mongo_client = MongoClient(MONGO_URI)
     mongo_db = mongo_client["shop_nosql"]
     
-    # Curatam bazele de date vechi (pentru a putea rula scriptul de mai multe ori)
+    # Curatam bazele de date vechi
     init_sql_schema(pg_cur)
     pg_cur.execute("TRUNCATE users, products, orders RESTART IDENTITY CASCADE;")
     mongo_db["products"].drop()
@@ -90,7 +89,7 @@ def generate_and_load():
 
     print("🚀 Incepem generarea datelor...")
 
-    # --- GENERARE PRODUSE ---
+    #Generare produse
     products_data = []
     categories = ['Electronics', 'Clothing', 'Home', 'Books']
     
@@ -110,16 +109,16 @@ def generate_and_load():
         }
         products_data.append(item)
 
-        # INSERT SQL (Normalize)
+        #Insert in SQL
         pg_cur.execute("""
             INSERT INTO products (name, category, price, description, specs)
             VALUES (%s, %s, %s, %s, %s)
         """, (item['name'], item['category'], item['price'], item['description'], json.dumps(item['specs'])))
 
-        # INSERT MONGO (Document - identic aici, dar structura e flexibila)
+        #Insert in mongo
         mongo_db["products"].insert_one(item.copy())
 
-    # --- GENERARE USERI ---
+    #Generare useri
     users_data = []
     print(f"   -> Generam {NUM_USERS} useri...")
     for _ in range(NUM_USERS):
@@ -131,24 +130,24 @@ def generate_and_load():
         }
         users_data.append(user)
         
-        # SQL
+        #Insert SQL
         pg_cur.execute("""
             INSERT INTO users (name, email, city, created_at)
             VALUES (%s, %s, %s, %s)
         """, (user['name'], user['email'], user['city'], user['created_at']))
         
-        # MONGO
+        #mongo insert
         mongo_db["users"].insert_one(user.copy())
 
-    # Commit SQL
+    #commit SQL
     pg_conn.commit()
     
-    # --- SALVARE DATASET (Cerință PDF) ---
+    #salvare dataset initial in JSON
     with open("dataset_initial.json", "w") as f:
         json.dump({"products": products_data, "users": [str(u) for u in users_data]}, f, default=str)
     
-    print(f"✅ Gata! Datele au fost incarcate in Postgres si Mongo.")
-    print(f"📁 Dataset salvat in 'dataset_initial.json' (pentru livrabil).")
+    print(f"Succes! Datele au fost incarcate in Postgres si Mongo.")
+    print(f"Dataset salvat in 'dataset_initial.json'.")
 
     pg_cur.close()
     pg_conn.close()
