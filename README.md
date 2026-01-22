@@ -89,6 +89,9 @@ Reliability (Chaos Test): When the node stops, PostgreSQL refuses connections im
   - chaos_test.py
     <img width="3420" height="2214" alt="image" src="https://github.com/user-attachments/assets/58d65659-e32a-4eca-bc3c-ce06d38423a1" />
 
+7. Video demonstration
+   https://youtu.be/sQ_jJ6FF424
+
 Bibliography
 
 1. PostgreSQL Documentation. Available at: https://www.postgresql.org/docs/
